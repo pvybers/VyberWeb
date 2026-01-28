@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "plyr/dist/plyr.css";
 
 :root {
   --background: #ffffff;
@@ -23,4 +24,26 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Make Plyr feel "invisible" (no UI). */
+.plyr__controls,
+.plyr__control,
+.plyr__progress,
+.plyr__time,
+.plyr__menu,
+.plyr__tooltip,
+.plyr__volume {
+  display: none !important;
+}
+
+.plyr {
+  width: 100%;
+  height: 100%;
+}
+
+.plyr video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }

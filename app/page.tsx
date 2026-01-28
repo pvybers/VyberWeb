@@ -1,65 +1,76 @@
-import Image from "next/image";
+import { redirect } from "next/navigation";
+import { readFile } from "node:fs/promises";
+import {
+  createWorld,
+  createWorldState,
+  listWorlds,
+  setActionsForWorldState,
+} from "@/lib/worldRepo";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+function extractInitialSceneSummary(fullPrompt: string): string {
+  // Use the text around Clip 01 and Clip 02 as the initial scene summary.
+  const clip1Idx = fullPrompt.indexOf("### Clip 01");
+  if (clip1Idx === -1) return "The story begins at night outside a SoMa corporate tower.";
+  const clip2Idx = fullPrompt.indexOf("### Clip 02", clip1Idx + 1);
+  const endIdx =
+    clip2Idx === -1 ? Math.min(fullPrompt.length, clip1Idx + 800) : Math.min(clip2Idx + 800, fullPrompt.length);
+  return fullPrompt.slice(clip1Idx, endIdx).trim();
+}
+
+export default async function Home() {
+  const worlds = await listWorlds();
+  if (worlds[0]) {
+    redirect(`/worlds/${worlds[0].id}`);
+  }
+
+  const worldPrompt = await readFile(`${process.cwd()}/worldPrompt.txt`, "utf8");
+
+  const world = await createWorld({
+    id: "default",
+    worldPrompt: worldPrompt.trim(),
+  });
+
+  // Use local clips from /data/vid served by the app.
+  // Clip1: frame1 -> frame2
+  // Clip2: frame2 -> frame3
+  // Clip3: frame3 -> frame4
+  const clip1 = "/data/vid/Clip1.mp4";
+  const clip2 = "/data/vid/Clip2.mp4";
+  const clip3 = "/data/vid/Clip3.mp4";
+  
+  // Use all 3 clips for seamless looping
+  const videoUrls = [clip1, clip2, clip3];
+  
+  // lastFrameUrl should be the end frame of the last clip
+  // Clip3 ends at frame4, so use frame4.png
+  const lastFrameUrl = "/data/frame/frame4.png";
+  
+  const state = await createWorldState({
+    worldId: world.id,
+    // Exactly 3 clips
+    videoUrls,
+    lastFrameUrl,
+    sceneSummary: extractInitialSceneSummary(worldPrompt),
+  });
+
+  await setActionsForWorldState({
+    worldStateId: state.id,
+    actions: [
+      { label: "Move forward", prompt: "Move forward cautiously and scan the area." },
+      { label: "Look around", prompt: "Turn your head and carefully observe the surroundings." },
+      { label: "Interact", prompt: "Interact with the most interesting object in view." },
+    ],
+  });
+
+  redirect(`/worlds/${world.id}`);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-black text-white">
+      <div className="mx-auto flex min-h-screen max-w-xl items-center justify-center px-6">
+        <p className="text-sm text-zinc-300">Booting your world…</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
     </div>
   );
 }
