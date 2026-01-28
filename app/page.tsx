@@ -6,6 +6,7 @@ import {
   listWorlds,
   setActionsForWorldState,
 } from "@/lib/worldRepo";
+import { suggestNextActionsWithGemini } from "@/lib/gemini";
 
 export const dynamic = "force-dynamic";
 
@@ -55,13 +56,25 @@ export default async function Home() {
     sceneSummary: extractInitialSceneSummary(worldPrompt),
   });
 
+  const initialActions =
+    (await suggestNextActionsWithGemini({
+      worldPrompt: worldPrompt.trim(),
+      sceneSummary: state.scene_summary,
+      actionPrompt: "The story is just beginning outside the SoMa tower.",
+      lastFrameUrl,
+    })) ?? [
+      // Fallback if Gemini is not configured.
+      { label: "Move forward", prompt: "Move forward cautiously and scan the area." },
+      {
+        label: "Look around",
+        prompt: "Turn your head and carefully observe the surroundings.",
+      },
+      { label: "Interact", prompt: "Interact with the most interesting object in view." },
+    ];
+
   await setActionsForWorldState({
     worldStateId: state.id,
-    actions: [
-      { label: "Move forward", prompt: "Move forward cautiously and scan the area." },
-      { label: "Look around", prompt: "Turn your head and carefully observe the surroundings." },
-      { label: "Interact", prompt: "Interact with the most interesting object in view." },
-    ],
+    actions: initialActions,
   });
 
   redirect(`/worlds/${world.id}`);

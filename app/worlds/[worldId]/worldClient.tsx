@@ -1,9 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { WorldCanvas } from "./worldCanvas";
 
 export type SuggestedAction = { label: string; prompt: string };
+type StoryboardPreview = {
+  storyboardId: string;
+  frameUrls: string[];
+  actionPrompt: string;
+};
 
 export function WorldClient(props: {
   worldId: string;
@@ -15,8 +20,37 @@ export function WorldClient(props: {
   const [loading, setLoading] = useState(false);
   const [custom, setCustom] = useState("");
   const [sceneSummary, setSceneSummary] = useState(props.initialSceneSummary);
+  const [error, setError] = useState<string | null>(null);
+  const [storyboard, setStoryboard] = useState<StoryboardPreview | null>(null);
 
   const initialClips = useMemo(() => props.initialVideoUrls, [props.initialVideoUrls]);
+
+  useEffect(() => {
+    const onStepError = (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { status?: number; body?: string; message?: string }
+        | undefined;
+      const msg =
+        detail?.message ||
+        (detail?.status
+          ? `Generation failed (${detail.status}). Please try a different action.`
+          : "Generation failed. Please try a different action.");
+      setError(msg);
+    };
+    window.addEventListener("vyber:stepError", onStepError as EventListener);
+    return () => window.removeEventListener("vyber:stepError", onStepError as EventListener);
+  }, []);
+
+  useEffect(() => {
+    const onStoryboardReady = (e: Event) => {
+      const detail = (e as CustomEvent).detail as StoryboardPreview | undefined;
+      if (!detail?.storyboardId || !detail?.frameUrls?.length) return;
+      setStoryboard(detail);
+    };
+    window.addEventListener("vyber:storyboardReady", onStoryboardReady as EventListener);
+    return () =>
+      window.removeEventListener("vyber:storyboardReady", onStoryboardReady as EventListener);
+  }, []);
 
   return (
     <div className="relative flex h-dvh w-dvw items-center justify-center bg-black">
@@ -87,16 +121,70 @@ export function WorldClient(props: {
               </button>
             </form>
 
-            {loading ? (
+            {error ? (
+              <p className="text-xs text-red-300">
+                {error}
+              </p>
+            ) : loading ? (
               <p className="text-xs text-white/80">Generating the next moment…</p>
             ) : (
               <p className="text-xs text-white/60">
-                Click an action. The video is the world — no controls, no scrubbing.
+                Click an action to preview a storyboard before generating video.
               </p>
             )}
           </div>
         </div>
       </div>
+
+      {storyboard ? (
+        <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-black/70 p-6">
+          <div className="w-full max-w-3xl rounded-2xl bg-black/85 p-6 text-white shadow-xl ring-1 ring-white/10">
+            <div className="mb-4 text-sm text-white/80">Storyboard preview</div>
+            <div className="grid grid-cols-2 gap-3">
+              {storyboard.frameUrls.map((url, idx) => (
+                <div key={url} className="overflow-hidden rounded-lg bg-black/30">
+                  <img
+                    src={url}
+                    alt={`Storyboard frame ${idx + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex items-center justify-between gap-4">
+              <p className="text-xs text-white/60">
+                Generate video from this storyboard?
+              </p>
+              <div className="flex gap-2">
+                <button
+                  disabled={loading}
+                  className="rounded-full border border-white/20 px-4 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50"
+                  onClick={() => setStoryboard(null)}
+                >
+                  Discard
+                </button>
+                <button
+                  disabled={loading}
+                  className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent("vyber:generateVideo", {
+                        detail: {
+                          storyboardId: storyboard.storyboardId,
+                          actionPrompt: storyboard.actionPrompt,
+                        },
+                      }),
+                    );
+                    setStoryboard(null);
+                  }}
+                >
+                  Generate video
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

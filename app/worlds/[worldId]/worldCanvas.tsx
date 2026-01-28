@@ -9,6 +9,11 @@ type StepResponse = {
   sceneSummary?: string;
 };
 
+type StoryboardResponse = {
+  storyboardId: string;
+  frameUrls: string[];
+};
+
 const SWAP_AT_SECONDS = 4.8;
 
 function waitForEvent(el: HTMLMediaElement, event: string): Promise<void> {
@@ -221,13 +226,27 @@ export function WorldCanvas(props: {
         const detail = (e as CustomEvent).detail as { prompt?: string };
         const prompt = detail?.prompt?.trim();
         if (!prompt) return;
-        void step(prompt);
+        void requestStoryboard(prompt);
       };
 
       window.addEventListener("vyber:action", onAction as EventListener);
 
+      const onGenerateVideo = (e: Event) => {
+        const detail = (e as CustomEvent).detail as {
+          storyboardId?: string;
+          actionPrompt?: string;
+        };
+        const storyboardId = detail?.storyboardId?.trim();
+        const actionPrompt = detail?.actionPrompt?.trim();
+        if (!storyboardId || !actionPrompt) return;
+        void generateVideo(actionPrompt, storyboardId);
+      };
+
+      window.addEventListener("vyber:generateVideo", onGenerateVideo as EventListener);
+
       const cleanup = () => {
         window.removeEventListener("vyber:action", onAction as EventListener);
+        window.removeEventListener("vyber:generateVideo", onGenerateVideo as EventListener);
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         
         // Remove event listeners
@@ -420,16 +439,58 @@ export function WorldCanvas(props: {
       console.log("✅ New clip set loaded and playing");
     }
 
-    async function step(actionPrompt: string) {
+    async function requestStoryboard(actionPrompt: string) {
       onLoadingRef.current(true);
       try {
-        const res = await fetch(`/api/worlds/${worldIdRef.current}/step`, {
+        const res = await fetch(`/api/worlds/${worldIdRef.current}/storyboard`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ actionPrompt }),
         });
         if (!res.ok) {
-          throw new Error(`Step failed: ${res.status} ${await res.text()}`);
+          const text = await res.text().catch(() => "");
+          const message = `Storyboard failed: ${res.status} ${text}`;
+          window.dispatchEvent(
+            new CustomEvent("vyber:stepError", {
+              detail: { status: res.status, body: text, message },
+            }),
+          );
+          throw new Error(message);
+        }
+        const json = (await res.json()) as StoryboardResponse;
+        window.dispatchEvent(
+          new CustomEvent("vyber:storyboardReady", {
+            detail: {
+              storyboardId: json.storyboardId,
+              frameUrls: json.frameUrls,
+              actionPrompt,
+            },
+          }),
+        );
+      } catch (error) {
+        console.error("❌ Error in requestStoryboard:", error);
+      } finally {
+        onLoadingRef.current(false);
+      }
+    }
+
+    async function generateVideo(actionPrompt: string, storyboardId: string) {
+      onLoadingRef.current(true);
+      try {
+        const res = await fetch(`/api/worlds/${worldIdRef.current}/step`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ actionPrompt, storyboardId }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          const message = `Step failed: ${res.status} ${text}`;
+          window.dispatchEvent(
+            new CustomEvent("vyber:stepError", {
+              detail: { status: res.status, body: text, message },
+            }),
+          );
+          throw new Error(message);
         }
         const json = (await res.json()) as StepResponse;
         onActionsRef.current(json.actions ?? []);
@@ -441,7 +502,7 @@ export function WorldCanvas(props: {
         pendingClipSetRef.current = json.videoUrls;
         console.log("📥 Received new video URLs, will swap when ready");
       } catch (error) {
-        console.error("❌ Error in step:", error);
+        console.error("❌ Error in generateVideo:", error);
       } finally {
         onLoadingRef.current(false);
       }

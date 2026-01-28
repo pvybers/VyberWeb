@@ -1,1 +1,91 @@
-## 1-Minute Storyboard (12 clips × 5 seconds) ### Clip 01 (0:00–0:05) Establishing — Corporate Tower (SoMa) * **Location:** Modern glass office building exterior, San Francisco SoMa * **Visual:** Night. Glass façade, scattered lit windows, wet pavement reflections, sparse foot traffic. * **Camera:** Wide → slow push-in (stabilized), documentary calm * **Story beat:** Target identified * **Prompt:** realistic cinematic night shot, San Francisco SOMA modern glass office tower, subtle rain reflections, slow dolly in, natural lighting, 35mm film look --- ### Clip 02 (0:05–0:10) Entry — Badge / Tailgate * **Location:** Lobby security turnstiles * **Visual:** Hoodie hacker keeps head down, swipes a badge or tailgates behind an employee; **LED turns red → green**. * **Camera:** Close side angle, slight handheld * **Story beat:** Infiltration succeeds * **Prompt:** realistic corporate lobby security gate, close-up access reader light turning green, hoodie person entering quietly, security camera visible, handheld tense realism --- ### Clip 03 (0:10–0:15) Elevator — Pressure Builds * **Location:** Elevator interior * **Visual:** Cold fluorescent light. Mirror reflection of the hacker's eyes. Floor numbers climbing. * **Camera:** Tight framing, subtle push-in * **Story beat:** Tension ramp * **Prompt:** elevator interior cold fluorescent lighting, reflective metal walls, close-up anxious eyes in mirror, floor numbers rising, shallow depth of field, cinematic realism --- ### Clip 04 (0:15–0:20) Hallway — Avoid Cameras * **Location:** Empty office corridor * **Visual:** Security camera with blinking indicator. Hacker moves along wall, passes an "EMPLOYEES ONLY" door sign. * **Camera:** Rear follow shot, handheld * **Story beat:** Surveillance threat established * **Prompt:** empty corporate hallway at night, security camera blinking red, hoodie figure moving cautiously along wall, handheld follow shot, realistic --- ### Clip 05 (0:20–0:25) Server Room — The Copy * **Location:** Server room / IT closet * **Visual:** Rack lights flicker. Hacker opens laptop, terminal text scrolls (realistic), plugs in a small **encrypted USB/SSD**. * **Camera:** Hands close-up + over-shoulder screen * **Story beat:** "Criminal code" is being extracted * **Prompt:** realistic server room, blinking rack lights, close-up hands plugging encrypted usb drive, laptop terminal code scrolling, cinematic realism, natural motion blur --- ### Clip 06 (0:25–0:30) Warning — Anomaly Detected * **Location:** Server room doorway + laptop UI * **Visual:** Subtle alert: "UNUSUAL DATA TRANSFER" / security notification. Distant footsteps or a radio chatter hint outside the door. * **Camera:** Screen close-up → cut to door crack / shadow * **Story beat:** Time runs out * **Prompt:** close-up realistic system alert "UNUSUAL DATA TRANSFER", dim server room, door crack with security shadow passing, tense handheld, realistic --- ### Clip 07 (0:30–0:35) Escape — Stairwell Sprint * **Location:** Emergency stairwell * **Visual:** Hacker runs downward fast; metallic echoes; flickering old fluorescent (grounded, not supernatural). * **Camera:** Handheld chase follow, mild shake * **Story beat:** Transition from theft to flight * **Prompt:** emergency stairwell, hoodie person running downstairs, fluorescent lights, handheld chase camera, gritty cinematic realism, motion blur --- ### Clip 08 (0:35–0:40) Exit — Back Door to Alley * **Location:** Rear exit into a SoMa alley * **Visual:** Door bursts open into cold night air. Graffiti, dumpsters, steam vent, city noise. * **Camera:** POV from inside pushing out; exposure shift on the doorway * **Story beat:** Out of the building, into the city * **Prompt:** POV push open metal door into San Francisco alley, graffiti, dumpsters, steam vent, night ambience, exposure shift, cinematic realism --- ### Clip 09 (0:40–0:45) Blend In — Downtown Crossing * **Location:** Street near Market St / SoMa edge * **Visual:** Hacker merges into pedestrians at a crosswalk. Streetlights, trolley tracks, normal traffic. * **Camera:** Medium follow from behind/side, doc style * **Story beat:** Lose the trail in plain sight * **Prompt:** San Francisco street at night, market street vibe, trolley tracks, pedestrians, hoodie person blending in, handheld documentary feel, 50mm look --- ### Clip 10 (0:45–0:50) Misdirection — Storefront Reflection * **Location:** Convenience store window / street corner * **Visual:** Hacker pauses, pretends to text. In the glass reflection: a security guard silhouette or distant flashing light passes (or just car headlights sweeping by). * **Camera:** Framed through reflective glass, cinematic composition * **Story beat:** Pursuers nearby, but not locked on * **Prompt:** storefront glass reflection at night, hoodie person pretending to text, distant flashing light reflection, shallow depth of field, realistic cinematic tension --- ### Clip 11 (0:50–0:55) Getaway — Into a Car * **Location:** Curbside pickup * **Visual:** A plain dark sedan pulls up (no branding). Hacker slips in fast, door shuts; city lights bokeh behind. * **Camera:** Low side angle on door action * **Story beat:** Escape route secured * **Prompt:** dark sedan pulls to curb, person quickly gets in, door closes, city lights bokeh, realistic cinematic, 35mm, handheld --- ### Clip 12 (0:55–1:00) End Tag — Code in Hand, SF Night Outside * **Location:** Inside car + city lights through window * **Visual:** Close-up of sweaty hand holding the **encrypted USB/SSD**. Breathing calms. Final beat: window view of SF night lights drifting by. * **Camera:** Hand close-up → gentle rack focus to outside bokeh * **Story beat:** Mission accomplished, danger lingering * **Prompt:** inside car at night, close-up sweaty hand holding encrypted usb drive, shallow depth of field, city lights through window bokeh, calm tense ending, cinematic realism --- ## Continuity Notes (to make 12 clips feel like one film) * Keep the hacker consistent: **dark hoodie + plain backpack + cap** (don't change outfit). * Keep the "code container" consistent: **same small USB/SSD design every clip**. * Lighting logic: **indoors cold fluorescent**, outdoors **SF sodium streetlight + blue night**. * Editing tip: aim to have a mini "action completion" around **second 4** of each clip so cuts feel intentional.
+Corporate tower infiltration story told as 12 sequential 5-second clips. Keep the hacker consistent and the world grounded in realistic, cinematic night visuals.
+
+Clip 01 (0:00–0:05) Establishing — Corporate Tower (SoMa)
+- Location: Modern glass office building exterior, San Francisco SoMa
+- Visual: Night. Glass facade, scattered lit windows, wet pavement reflections, sparse foot traffic.
+- Camera: Wide to slow push-in (stabilized), documentary calm
+- Story beat: Target identified
+- Prompt: realistic cinematic night shot, San Francisco SOMA modern glass office tower, subtle rain reflections, slow dolly in, natural lighting, 35mm film look
+
+Clip 02 (0:05–0:10) Entry — Badge / Tailgate
+- Location: Lobby security turnstiles
+- Visual: Hoodie hacker keeps head down, swipes a badge or tailgates behind an employee; LED turns red to green.
+- Camera: Close side angle, slight handheld
+- Story beat: Infiltration succeeds
+- Prompt: realistic corporate lobby security gate, close-up access reader light turning green, hoodie person entering quietly, security camera visible, handheld tense realism
+
+Clip 03 (0:10–0:15) Elevator — Pressure Builds
+- Location: Elevator interior
+- Visual: Cold fluorescent light. Mirror reflection of the hacker's eyes. Floor numbers climbing.
+- Camera: Tight framing, subtle push-in
+- Story beat: Tension ramp
+- Prompt: elevator interior cold fluorescent lighting, reflective metal walls, close-up anxious eyes in mirror, floor numbers rising, shallow depth of field, cinematic realism
+
+Clip 04 (0:15–0:20) Hallway — Avoid Cameras
+- Location: Empty office corridor
+- Visual: Security camera with blinking indicator. Hacker moves along wall, passes an "EMPLOYEES ONLY" door sign.
+- Camera: Rear follow shot, handheld
+- Story beat: Surveillance threat established
+- Prompt: empty corporate hallway at night, security camera blinking red, hoodie figure moving cautiously along wall, handheld follow shot, realistic
+
+Clip 05 (0:20–0:25) Server Room — The Copy
+- Location: Server room / IT closet
+- Visual: Rack lights flicker. Hacker opens laptop, terminal text scrolls (realistic), plugs in a small encrypted USB/SSD.
+- Camera: Hands close-up plus over-shoulder screen
+- Story beat: "Criminal code" is being extracted
+- Prompt: realistic server room, blinking rack lights, close-up hands plugging encrypted usb drive, laptop terminal code scrolling, cinematic realism, natural motion blur
+
+Clip 06 (0:25–0:30) Warning — Anomaly Detected
+- Location: Server room doorway plus laptop UI
+- Visual: Subtle alert: "UNUSUAL DATA TRANSFER" security notification. Distant footsteps or radio chatter hint outside the door.
+- Camera: Screen close-up, cut to door crack or shadow
+- Story beat: Time runs out
+- Prompt: close-up realistic system alert "UNUSUAL DATA TRANSFER", dim server room, door crack with security shadow passing, tense handheld, realistic
+
+Clip 07 (0:30–0:35) Escape — Stairwell Sprint
+- Location: Emergency stairwell
+- Visual: Hacker runs downward fast; metallic echoes; flickering old fluorescent (grounded, not supernatural).
+- Camera: Handheld chase follow, mild shake
+- Story beat: Transition from theft to flight
+- Prompt: emergency stairwell, hoodie person running downstairs, fluorescent lights, handheld chase camera, gritty cinematic realism, motion blur
+
+Clip 08 (0:35–0:40) Exit — Back Door to Alley
+- Location: Rear exit into a SoMa alley
+- Visual: Door bursts open into cold night air. Graffiti, dumpsters, steam vent, city noise.
+- Camera: POV from inside pushing out; exposure shift on the doorway
+- Story beat: Out of the building, into the city
+- Prompt: POV push open metal door into San Francisco alley, graffiti, dumpsters, steam vent, night ambience, exposure shift, cinematic realism
+
+Clip 09 (0:40–0:45) Blend In — Downtown Crossing
+- Location: Street near Market St / SoMa edge
+- Visual: Hacker merges into pedestrians at a crosswalk. Streetlights, trolley tracks, normal traffic.
+- Camera: Medium follow from behind or side, doc style
+- Story beat: Lose the trail in plain sight
+- Prompt: San Francisco street at night, market street vibe, trolley tracks, pedestrians, hoodie person blending in, handheld documentary feel, 50mm look
+
+Clip 10 (0:45–0:50) Misdirection — Storefront Reflection
+- Location: Convenience store window / street corner
+- Visual: Hacker pauses, pretends to text. In the glass reflection: a security guard silhouette or distant flashing light passes (or car headlights sweep by).
+- Camera: Framed through reflective glass, cinematic composition
+- Story beat: Pursuers nearby, but not locked on
+- Prompt: storefront glass reflection at night, hoodie person pretending to text, distant flashing light reflection, shallow depth of field, realistic cinematic tension
+
+Clip 11 (0:50–0:55) Getaway — Into a Car
+- Location: Curbside pickup
+- Visual: A plain dark sedan pulls up (no branding). Hacker slips in fast, door shuts; city lights bokeh behind.
+- Camera: Low side angle on door action
+- Story beat: Escape route secured
+- Prompt: dark sedan pulls to curb, person quickly gets in, door closes, city lights bokeh, realistic cinematic, 35mm, handheld
+
+Clip 12 (0:55–1:00) End Tag — Code in Hand, SF Night Outside
+- Location: Inside car plus city lights through window
+- Visual: Close-up of sweaty hand holding the encrypted USB/SSD. Breathing calms. Final beat: window view of SF night lights drifting by.
+- Camera: Hand close-up, gentle rack focus to outside bokeh
+- Story beat: Mission accomplished, danger lingering
+- Prompt: inside car at night, close-up sweaty hand holding encrypted usb drive, shallow depth of field, city lights through window bokeh, calm tense ending, cinematic realism
+
+Continuity notes:
+- Keep the hacker consistent: dark hoodie, plain backpack, cap (do not change outfit).
+- Keep the "code container" consistent: same small USB/SSD design every clip.
+- Lighting logic: indoors cold fluorescent, outdoors SF sodium streetlight plus blue night.
+- Editing tip: aim for a mini "action completion" around second 4 of each clip.

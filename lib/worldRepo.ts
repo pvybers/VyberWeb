@@ -13,6 +13,17 @@ export type WorldStateRow = {
   video_urls: string[];
   last_frame_url: string;
   scene_summary: string;
+  storyboard_id: string | null;
+  storyboard_frame_urls: string[] | null;
+  created_at: Date;
+};
+
+export type WorldStoryboardRow = {
+  id: string;
+  world_id: string;
+  action_prompt: string;
+  frame_urls: string[];
+  source_frame_url: string;
   created_at: Date;
 };
 
@@ -67,6 +78,8 @@ export async function createWorldState(input: {
   videoUrls: string[];
   lastFrameUrl: string;
   sceneSummary: string;
+  storyboardId?: string | null;
+  storyboardFrameUrls?: string[] | null;
 }): Promise<WorldStateRow> {
   await ensureSchema();
   if (input.videoUrls.length !== 3) {
@@ -75,12 +88,52 @@ export async function createWorldState(input: {
 
   const id = input.id ?? newId();
   const res = await dbQuery<WorldStateRow>(
-    `insert into world_states (id, world_id, video_urls, last_frame_url, scene_summary)
-     values ($1, $2, $3, $4, $5)
+    `insert into world_states (id, world_id, video_urls, last_frame_url, scene_summary, storyboard_id, storyboard_frame_urls)
+     values ($1, $2, $3, $4, $5, $6, $7)
      returning *`,
-    [id, input.worldId, input.videoUrls, input.lastFrameUrl, input.sceneSummary],
+    [
+      id,
+      input.worldId,
+      input.videoUrls,
+      input.lastFrameUrl,
+      input.sceneSummary,
+      input.storyboardId ?? null,
+      input.storyboardFrameUrls ?? null,
+    ],
   );
   return res.rows[0]!;
+}
+
+export async function createWorldStoryboard(input: {
+  id?: string;
+  worldId: string;
+  actionPrompt: string;
+  frameUrls: string[];
+  sourceFrameUrl: string;
+}): Promise<WorldStoryboardRow> {
+  await ensureSchema();
+  if (input.frameUrls.length !== 4) {
+    throw new Error("worldStoryboard.frameUrls must have exactly 4 items");
+  }
+  const id = input.id ?? newId();
+  const res = await dbQuery<WorldStoryboardRow>(
+    `insert into world_storyboards (id, world_id, action_prompt, frame_urls, source_frame_url)
+     values ($1, $2, $3, $4, $5)
+     returning *`,
+    [id, input.worldId, input.actionPrompt, input.frameUrls, input.sourceFrameUrl],
+  );
+  return res.rows[0]!;
+}
+
+export async function getWorldStoryboard(
+  storyboardId: string,
+): Promise<WorldStoryboardRow | null> {
+  await ensureSchema();
+  const res = await dbQuery<WorldStoryboardRow>(
+    "select * from world_storyboards where id = $1",
+    [storyboardId],
+  );
+  return res.rows[0] ?? null;
 }
 
 export async function setActionsForWorldState(input: {

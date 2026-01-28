@@ -65,6 +65,25 @@ export async function ensureSchema(): Promise<void> {
 
     create index if not exists actions_world_state_id_idx
       on actions(world_state_id);
+
+    create table if not exists world_storyboards (
+      id text primary key,
+      world_id text not null references worlds(id) on delete cascade,
+      action_prompt text not null,
+      frame_urls text[] not null,
+      source_frame_url text not null,
+      created_at timestamptz not null default now(),
+      constraint world_storyboards_frame_urls_len check (array_length(frame_urls, 1) = 4)
+    );
+
+    create index if not exists world_storyboards_world_id_created_at_idx
+      on world_storyboards(world_id, created_at desc);
+
+    alter table world_states
+      add column if not exists storyboard_id text references world_storyboards(id) on delete set null;
+
+    alter table world_states
+      add column if not exists storyboard_frame_urls text[];
   `);
 }
 

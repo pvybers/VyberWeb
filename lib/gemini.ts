@@ -11,10 +11,49 @@ const SuggestedActionsSchema = z
   .min(3)
   .max(4);
 
+function normalizeImageUrl(url: string): string {
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const base = process.env.APP_ORIGIN?.trim() || "http://127.0.0.1:3000";
+  if (url.startsWith("/")) return `${base}${url}`;
+  return `${base}/${url}`;
+}
+
+async function fetchImageAsInlineData(
+  url: string,
+): Promise<{ mimeType: string; data: string } | null> {
+  try {
+    // If we already have a data URL, parse it directly instead of re-fetching.
+    if (url.startsWith("data:")) {
+      const match = /^data:([^;]+);base64,(.+)$/.exec(url);
+      if (!match) {
+        console.warn("[gemini] Unsupported data URL format for last frame image");
+        return null;
+      }
+      const [, mimeType, data] = match;
+      return { mimeType, data };
+    }
+
+    const absoluteUrl = normalizeImageUrl(url);
+    const res = await fetch(absoluteUrl);
+    if (!res.ok) {
+      console.warn("[gemini] Failed to fetch last frame image:", res.status, absoluteUrl);
+      return null;
+    }
+    const contentType = res.headers.get("content-type") ?? "image/png";
+    const buf = Buffer.from(await res.arrayBuffer());
+    const b64 = buf.toString("base64");
+    return { mimeType: contentType, data: b64 };
+  } catch (err) {
+    console.warn("[gemini] Error fetching last frame image", err);
+    return null;
+  }
+}
+
 export async function suggestNextActionsWithGemini(input: {
   worldPrompt: string;
   sceneSummary: string;
   actionPrompt: string;
+  lastFrameUrl?: string;
 }): Promise<{ label: string; prompt: string }[] | null> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) return null;
@@ -41,13 +80,29 @@ export async function suggestNextActionsWithGemini(input: {
     "LAST USER ACTION:",
     input.actionPrompt.trim(),
     "",
+    "You are also given the most recent visual frame from the world.",
+    "Use the visual details in that frame to keep actions tightly grounded in what is actually on screen.",
+    "",
     "Generate the next 3-4 plausible actions that could happen next.",
   ].join("\n");
 
-  const resp = await model.generateContent([
+  let inlineImage: { mimeType: string; data: string } | null = null;
+  if (input.lastFrameUrl) {
+    inlineImage = await fetchImageAsInlineData(input.lastFrameUrl);
+  }
+
+  const parts = [
     { text: system },
     { text: user },
-  ]);
+    ...(inlineImage ? [{ inlineData: inlineImage }] : []),
+  ];
+
+  console.log("[gemini] Requesting next actions", {
+    hasImage: Boolean(inlineImage),
+    model: modelName,
+  });
+
+  const resp = await model.generateContent(parts as any);
 
   const text = resp.response.text().trim();
   const json = JSON.parse(text);
