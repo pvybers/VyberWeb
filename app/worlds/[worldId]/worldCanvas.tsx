@@ -34,7 +34,14 @@ function waitForEvent(el: HTMLMediaElement, event: string): Promise<void> {
 }
 
 async function loadVideo(el: HTMLVideoElement, url: string): Promise<void> {
-  const normalizedUrl = url.startsWith("/") ? url : `/${url}`;
+  let normalizedUrl = url.startsWith("/") ? url : `/${url}`;
+  if (
+    normalizedUrl.startsWith("/data/") &&
+    !normalizedUrl.startsWith("/data/vid/") &&
+    normalizedUrl.toLowerCase().endsWith(".mp4")
+  ) {
+    normalizedUrl = normalizedUrl.replace("/data/", "/data/vid/");
+  }
   
   // Always reload if URL is different
   if (!el.src || !el.src.endsWith(normalizedUrl)) {

@@ -78,20 +78,6 @@ function findFirstVideoUrl(value: unknown): string | null {
   return null;
 }
 
-let debugTaskQueue: string[] | null = null;
-
-function parseDebugTaskIds(): string[] {
-  const raw =
-    process.env.SEEDANCE_DEBUG_TASK_IDS?.trim() ??
-    process.env.SEEDREAM_DEBUG_TASK_IDS?.trim() ??
-    "";
-  if (!raw) return [];
-  return raw
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean);
-}
-
 function isTaskFinished(json: z.infer<typeof SeedanceTaskResponse>): boolean {
   const s = (json.status ?? json.task_status ?? "").toUpperCase();
   return s === "SUCCEEDED" || s === "SUCCESS" || s === "FINISHED";
@@ -141,15 +127,6 @@ export async function seedanceGenerateClip(input: {
     hasStartImage: Boolean(input.startImage),
     hasEndImage: Boolean(input.endImage),
   });
-
-  if (debugTaskQueue === null) {
-    debugTaskQueue = parseDebugTaskIds();
-  }
-  if (debugTaskQueue.length > 0) {
-    const taskId = debugTaskQueue.shift()!;
-    console.warn("[seedance][debug] Using hardcoded task id", { taskId });
-    return await pollSeedanceTask({ taskId, headers });
-  }
 
   // 1) Create generation task.
   const baseUrl = resolveSeedanceBase();
