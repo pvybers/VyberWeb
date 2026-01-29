@@ -104,6 +104,44 @@ function resolveTaskPath(taskId: string): string {
   return template.replace("{taskId}", taskId);
 }
 
+function normalizeError(err: unknown) {
+  if (err instanceof Error) {
+    const cause =
+      err.cause instanceof Error
+        ? { name: err.cause.name, message: err.cause.message }
+        : err.cause;
+    return { name: err.name, message: err.message, stack: err.stack, cause };
+  }
+  return { value: err };
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+function logKlingError(message: string, details: Record<string, unknown>) {
+  console.error(`[kling] ${message}`, details);
+}
+
+function parseMaybeJson(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function computeRetryDelayMs(status: number, bodyText: string, attempt: number): number {
+  if (status === 429) {
+    const parsed = parseMaybeJson(bodyText) as { code?: number } | null;
+    if (parsed?.code === 1303) {
+      return 3000 + attempt * 1000;
+    }
+  }
+  return 700 * attempt;
+}
+
 function pickTaskId(value: z.infer<typeof KlingCreateResponse> | z.infer<typeof KlingTaskResponse>) {
   return value.data?.taskId ?? value.data?.task_id ?? null;
 }
@@ -204,11 +242,11 @@ export async function createKlingTask(input: {
   const baseUrl = resolveBaseUrl();
   const createUrl = `${baseUrl}${resolveCreatePath()}`;
   const body: Record<string, unknown> = {
-    model: "kling-v2-6",
+    model_name: "kling-v2-5-turbo",
     image: normalizeImageInput(input.startImage),
     image_tail: normalizeImageInput(input.endImage),
     duration: input.seconds ?? 5,
-    mode: "std",
+    mode: "pro",
   };
   if (input.prompt) body.prompt = input.prompt;
   if (input.negativePrompt) body.negative_prompt = input.negativePrompt;
@@ -224,36 +262,74 @@ export async function createKlingTask(input: {
     seconds: input.seconds ?? 5,
   });
 
-  const createRes = await fetch(createUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
-
-  if (!createRes.ok) {
-    const text = await createRes.text().catch(() => "<no body>");
-    console.error("[kling] Create HTTP error", createRes.status, text);
-    throw new Error(`Kling create failed: ${createRes.status} ${text}`);
-  }
-
-  const createJson = await createRes.json().catch(() => null);
-  if (!createJson) return null;
-
-  const parsed = KlingCreateResponse.safeParse(createJson);
-  if (!parsed.success) {
-    console.warn("[kling] Create parse failed, using raw scan");
-  }
-
-  const taskId = parsed.success ? pickTaskId(parsed.data) : null;
-  if (!taskId) {
-    const immediateUrl = findFirstVideoUrl(createJson);
-    if (immediateUrl) {
-      return { videoUrl: normalizeVideoUrl(baseUrl, immediateUrl) };
+  const maxAttempts = Math.max(1, Number(process.env.KLING_CREATE_ATTEMPTS ?? "3"));
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    let createRes: Response;
+    try {
+      createRes = await fetch(createUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+    } catch (err) {
+      logKlingError("Create request failed", {
+        attempt,
+        maxAttempts,
+        error: normalizeError(err),
+      });
+      if (attempt < maxAttempts) {
+        await sleep(600 * attempt);
+        continue;
+      }
+      throw new Error("Kling create request failed after retries.");
     }
-    return null;
+
+    if (!createRes.ok) {
+      const text = await createRes.text().catch(() => "<no body>");
+      const parsedBody = parseMaybeJson(text);
+      logKlingError("Create HTTP error", {
+        attempt,
+        maxAttempts,
+        status: createRes.status,
+        body: parsedBody ?? text,
+      });
+      if (attempt < maxAttempts && isRetryableStatus(createRes.status)) {
+        const delayMs = computeRetryDelayMs(createRes.status, text, attempt);
+        await sleep(delayMs);
+        continue;
+      }
+      throw new Error(`Kling create failed: ${createRes.status} ${text}`);
+    }
+
+    const createJson = await createRes.json().catch(() => null);
+    if (!createJson) {
+      logKlingError("Create JSON parse failed", { attempt, maxAttempts });
+      return null;
+    }
+
+    const parsed = KlingCreateResponse.safeParse(createJson);
+    if (!parsed.success) {
+      console.warn("[kling] Create parse failed, using raw scan");
+    }
+
+    const taskId = parsed.success ? pickTaskId(parsed.data) : null;
+    if (!taskId) {
+      const immediateUrl = findFirstVideoUrl(createJson);
+      if (immediateUrl) {
+        return { videoUrl: normalizeVideoUrl(baseUrl, immediateUrl) };
+      }
+      logKlingError("Create response missing task id", {
+        attempt,
+        maxAttempts,
+        response: createJson,
+      });
+      return null;
+    }
+
+    return { handle: { taskId, headers, baseUrl } };
   }
 
-  return { handle: { taskId, headers, baseUrl } };
+  return null;
 }
 
 export async function pollKlingTask(input: {
@@ -283,12 +359,17 @@ export async function pollKlingTask(input: {
     } catch (err) {
       console.warn("[kling] Poll fetch failed, retrying", {
         taskId: input.taskId,
-        error: err,
+        error: normalizeError(err),
       });
       continue;
     }
     if (!pollRes.ok) {
-      console.warn("[kling] Poll HTTP error, retrying", pollRes.status);
+      const text = await pollRes.text().catch(() => "<no body>");
+      console.warn("[kling] Poll HTTP error, retrying", {
+        taskId: input.taskId,
+        status: pollRes.status,
+        body: text,
+      });
       continue;
     }
 
@@ -300,7 +381,11 @@ export async function pollKlingTask(input: {
       ? parsed.data.data?.status ?? parsed.data.data?.task_status
       : (pollJson?.data?.status ?? pollJson?.data?.task_status);
     if (isStatusFailed(status)) {
-      console.error("[kling] Task failed", { taskId: input.taskId, status });
+      console.error("[kling] Task failed", {
+        taskId: input.taskId,
+        status,
+        response: parsed.success ? parsed.data : pollJson,
+      });
       return null;
     }
     if (!isStatusFinished(status)) continue;

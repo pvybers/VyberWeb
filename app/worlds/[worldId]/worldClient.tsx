@@ -32,10 +32,10 @@ export function WorldClient(props: {
   const [custom, setCustom] = useState("");
   const [sceneSummary, setSceneSummary] = useState(props.initialSceneSummary);
   const [error, setError] = useState<string | null>(null);
-  const [storyboard, setStoryboard] = useState<StoryboardPreview | null>(null);
   const [history, setHistory] = useState<WorldStateSnapshot[]>([]);
   const [activeStateId, setActiveStateId] = useState<string>(props.initialStateId);
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [showCustomToggle, setShowCustomToggle] = useState(false);
   const isMockMode = process.env.NEXT_PUBLIC_MOCK_MODE === "true";
 
   const actionsTimerRef = useRef<number | null>(null);
@@ -90,7 +90,14 @@ export function WorldClient(props: {
     const onStoryboardReady = (e: Event) => {
       const detail = (e as CustomEvent).detail as StoryboardPreview | undefined;
       if (!detail?.storyboardId || !detail?.frameUrls?.length) return;
-      setStoryboard(detail);
+      window.dispatchEvent(
+        new CustomEvent("vyber:generateVideo", {
+          detail: {
+            storyboardId: detail.storyboardId,
+            actionPrompt: detail.actionPrompt,
+          },
+        }),
+      );
     };
     window.addEventListener("vyber:storyboardReady", onStoryboardReady as EventListener);
     return () =>
@@ -104,6 +111,11 @@ export function WorldClient(props: {
   useEffect(() => {
     void refreshHistory();
   }, [refreshHistory]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowCustomToggle(true), 250);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const onStateCreated = (e: Event) => {
@@ -166,22 +178,17 @@ export function WorldClient(props: {
     orderedHistory.forEach(assignLane);
     return laneMap;
   }, [orderedHistory]);
-  const maxLane = useMemo(
-    () => Math.max(0, ...Array.from(laneById.values())),
-    [laneById],
-  );
-  const lastIndexByLane = useMemo(() => {
-    const map = new Map<number, number>();
-    orderedHistory.forEach((state, idx) => {
-      const lane = laneById.get(state.id) ?? 0;
-      map.set(lane, idx);
-    });
-    return map;
-  }, [orderedHistory, laneById]);
   const activeIndex = useMemo(
     () => orderedHistory.findIndex((state) => state.id === activeStateId),
     [orderedHistory, activeStateId],
   );
+  const indexById = useMemo(() => {
+    const map = new Map<string, number>();
+    orderedHistory.forEach((state, idx) => map.set(state.id, idx));
+    return map;
+  }, [orderedHistory]);
+  const rowHeight = 38;
+  const branchColors = ["#22d3ee", "#a78bfa", "#34d399", "#f97316", "#f43f5e", "#facc15"];
 
   return (
     <div className="relative flex h-dvh w-dvw items-center justify-center bg-black">
@@ -235,7 +242,7 @@ export function WorldClient(props: {
               ))}
             </div>
 
-            {showCustomInput ? (
+            {showCustomInput && !isMockMode ? (
               <form
                 className="flex gap-2"
                 onSubmit={(e) => {
@@ -275,35 +282,39 @@ export function WorldClient(props: {
               <p className="text-xs text-white/60">
                 {actions.length === 0
                   ? "New prompts arrive in 5 seconds..."
-                  : "Click an action to preview a storyboard before generating video."}
+                  : "Click an action to generate the next video."}
               </p>
             )}
           </div>
         </div>
       </div>
 
-      {!showCustomInput ? (
-        <button
-          className="pointer-events-auto absolute right-6 top-6 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[11px] text-white/70 opacity-60 transition-opacity hover:opacity-100"
-          onClick={() => setShowCustomInput(true)}
-        >
-          Custom input
-        </button>
-      ) : (
-        <button
-          className="pointer-events-auto absolute right-6 top-6 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[11px] text-white/70 opacity-70 transition-opacity hover:opacity-100"
-          onClick={() => setShowCustomInput(false)}
-        >
-          Hide input
-        </button>
-      )}
+      {!isMockMode ? (
+        !showCustomInput ? (
+          <button
+            className={`pointer-events-auto absolute right-6 top-6 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[11px] text-white/70 transition-opacity hover:opacity-100 ${
+              showCustomToggle ? "opacity-60" : "opacity-0"
+            }`}
+            onClick={() => setShowCustomInput(true)}
+          >
+            Custom input
+          </button>
+        ) : (
+          <button
+            className="pointer-events-auto absolute right-6 top-6 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[11px] text-white/70 opacity-70 transition-opacity hover:opacity-100"
+            onClick={() => setShowCustomInput(false)}
+          >
+            Hide input
+          </button>
+        )
+      ) : null}
 
       {/* Time travel panel */}
       <div className="pointer-events-auto absolute left-5 top-1/2 hidden -translate-y-1/2 md:block">
         <div className="w-64 rounded-2xl border border-white/10 bg-black/35 p-4 text-white backdrop-blur-md shadow-[0_0_30px_rgba(80,40,150,0.25)]">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
-              Time Travel
+              Timeline
             </div>
             <div className="flex gap-2">
               <button
@@ -329,56 +340,26 @@ export function WorldClient(props: {
             </div>
           </div>
 
-          <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+          <div className="max-h-[60vh] space-y-1 overflow-y-auto pr-1">
             {orderedHistory.map((state, idx) => {
               const isActive = state.id === activeStateId;
               const lane = laneById.get(state.id) ?? 0;
-              const parentLane =
-                state.parentStateId ? laneById.get(state.parentStateId) ?? lane : lane;
+              const parentIdx = state.parentStateId
+                ? indexById.get(state.parentStateId)
+                : undefined;
+              const branchColor = branchColors[lane % branchColors.length];
+              const indent = Math.min(lane * 8, 24);
               return (
                 <button
                   key={state.id}
                   onClick={() => jumpToState(state)}
-                  className="group flex w-full items-start gap-3 text-left"
+                  className="group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/5"
+                  style={{ minHeight: rowHeight, marginLeft: indent }}
                 >
-                  <svg
-                    width={(maxLane + 1) * 14 + 10}
-                    height={24}
-                    className="shrink-0"
-                  >
-                    {Array.from({ length: maxLane + 1 }).map((_, laneIdx) => {
-                      const lastIndex = lastIndexByLane.get(laneIdx) ?? -1;
-                      if (lastIndex < idx) return null;
-                      const x = laneIdx * 14 + 7;
-                      return (
-                        <line
-                          key={laneIdx}
-                          x1={x}
-                          y1={0}
-                          x2={x}
-                          y2={24}
-                          stroke="rgba(255,255,255,0.18)"
-                          strokeWidth="1"
-                        />
-                      );
-                    })}
-                    {state.parentStateId && parentLane !== lane ? (
-                      <line
-                        x1={parentLane * 14 + 7}
-                        y1={12}
-                        x2={lane * 14 + 7}
-                        y2={12}
-                        stroke="rgba(255,255,255,0.35)"
-                        strokeWidth="1"
-                      />
-                    ) : null}
-                    <circle
-                      cx={lane * 14 + 7}
-                      cy={12}
-                      r={4}
-                      fill={isActive ? "#34d399" : "rgba(255,255,255,0.35)"}
-                    />
-                  </svg>
+                  <span
+                    className="h-10 w-1 shrink-0 rounded-full"
+                    style={{ backgroundColor: branchColor }}
+                  />
                   <div className="flex-1">
                     <div className="flex items-center justify-between text-xs text-white/70">
                       <span className={isActive ? "text-emerald-200" : ""}>
@@ -391,8 +372,14 @@ export function WorldClient(props: {
                         })}
                       </span>
                     </div>
-                    <div className="mt-1 line-clamp-2 text-[11px] text-white/50 group-hover:text-white/70">
+                    <div className="mt-1 line-clamp-2 text-[11px] text-white/55 group-hover:text-white/75">
                       {state.sceneSummary}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/40">
+                      {parentIdx !== undefined ? `↳ from Snapshot ${parentIdx + 1}` : "Root"}
+                      {state.parentActionPrompt
+                        ? ` • "${state.parentActionPrompt.slice(0, 60)}"`
+                        : ""}
                     </div>
                   </div>
                 </button>
@@ -401,56 +388,6 @@ export function WorldClient(props: {
           </div>
         </div>
       </div>
-
-      {storyboard ? (
-        <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-black/70 p-6">
-          <div className="w-full max-w-3xl rounded-2xl bg-black/85 p-6 text-white shadow-xl ring-1 ring-white/10">
-            <div className="mb-4 text-sm text-white/80">Storyboard preview</div>
-            <div className="grid grid-cols-2 gap-3">
-              {storyboard.frameUrls.map((url, idx) => (
-                <div key={url} className="overflow-hidden rounded-lg bg-black/30">
-                  <img
-                    src={url}
-                    alt={`Storyboard frame ${idx + 1}`}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center justify-between gap-4">
-              <p className="text-xs text-white/60">
-                Generate video from this storyboard?
-              </p>
-              <div className="flex gap-2">
-                <button
-                  disabled={loading}
-                  className="rounded-full border border-white/20 px-4 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50"
-                  onClick={() => setStoryboard(null)}
-                >
-                  Discard
-                </button>
-                <button
-                  disabled={loading}
-                  className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
-                  onClick={() => {
-                    window.dispatchEvent(
-                      new CustomEvent("vyber:generateVideo", {
-                        detail: {
-                          storyboardId: storyboard.storyboardId,
-                          actionPrompt: storyboard.actionPrompt,
-                        },
-                      }),
-                    );
-                    setStoryboard(null);
-                  }}
-                >
-                  Generate video
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
