@@ -16,6 +16,7 @@ export type WorldStateRow = {
   storyboard_id: string | null;
   storyboard_frame_urls: string[] | null;
   parent_state_id: string | null;
+  parent_action_prompt: string | null;
   created_at: Date;
 };
 
@@ -99,6 +100,7 @@ export async function createWorldState(input: {
   storyboardId?: string | null;
   storyboardFrameUrls?: string[] | null;
   parentStateId?: string | null;
+  parentActionPrompt?: string | null;
 }): Promise<WorldStateRow> {
   await ensureSchema();
   if (input.videoUrls.length !== 3) {
@@ -107,8 +109,8 @@ export async function createWorldState(input: {
 
   const id = input.id ?? newId();
   const res = await dbQuery<WorldStateRow>(
-    `insert into world_states (id, world_id, video_urls, last_frame_url, scene_summary, storyboard_id, storyboard_frame_urls, parent_state_id)
-     values ($1, $2, $3, $4, $5, $6, $7, $8)
+    `insert into world_states (id, world_id, video_urls, last_frame_url, scene_summary, storyboard_id, storyboard_frame_urls, parent_state_id, parent_action_prompt)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      returning *`,
     [
       id,
@@ -119,6 +121,7 @@ export async function createWorldState(input: {
       input.storyboardId ?? null,
       input.storyboardFrameUrls ?? null,
       input.parentStateId ?? null,
+      input.parentActionPrompt ?? null,
     ],
   );
   return res.rows[0]!;

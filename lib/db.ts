@@ -98,6 +98,9 @@ export async function ensureSchema(): Promise<void> {
 
         create index if not exists world_states_parent_state_id_idx
           on world_states(parent_state_id);
+
+        alter table world_states
+          add column if not exists parent_action_prompt text;
       `);
     } finally {
       try {

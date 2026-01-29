@@ -69,6 +69,7 @@ async function ensureVideoPlaying(el: HTMLVideoElement): Promise<void> {
 
 export function WorldCanvas(props: {
   worldId: string;
+  currentStateId: string;
   initialVideoUrls: string[];
   onActions: (actions: SuggestedAction[]) => void;
   onLoading: (loading: boolean) => void;
@@ -81,6 +82,7 @@ export function WorldCanvas(props: {
   const onActionsRef = useRef(props.onActions);
   const onLoadingRef = useRef(props.onLoading);
   const onSceneSummaryRef = useRef(props.onSceneSummary);
+  const currentStateIdRef = useRef(props.currentStateId);
   const clipSetRef = useRef<string[]>(props.initialVideoUrls);
   const clipIndexRef = useRef(0);
   const activeSlotRef = useRef<0 | 1>(0);
@@ -100,8 +102,10 @@ export function WorldCanvas(props: {
     onLoadingRef.current = props.onLoading;
     onSceneSummaryRef.current = props.onSceneSummary;
     clipSetRef.current = props.initialVideoUrls;
+    currentStateIdRef.current = props.currentStateId;
   }, [
     props.worldId,
+    props.currentStateId,
     props.onActions,
     props.onLoading,
     props.onSceneSummary,
@@ -497,7 +501,11 @@ export function WorldCanvas(props: {
         const res = await fetch(`/api/worlds/${worldIdRef.current}/step`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ actionPrompt, storyboardId }),
+          body: JSON.stringify({
+            actionPrompt,
+            storyboardId,
+            parentStateId: currentStateIdRef.current,
+          }),
         });
         if (!res.ok) {
           const text = await res.text().catch(() => "");

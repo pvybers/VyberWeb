@@ -33,6 +33,7 @@ export async function GET(
       sceneSummary: state.scene_summary,
       videoUrls: state.video_urls,
       parentStateId: state.parent_state_id,
+      parentActionPrompt: state.parent_action_prompt,
       actions: (actionsMap.get(state.id) ?? []).map((a) => ({
         label: a.label,
         prompt: a.prompt,

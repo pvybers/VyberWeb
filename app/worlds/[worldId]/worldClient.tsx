@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WorldCanvas } from "./worldCanvas";
 
 export type SuggestedAction = { label: string; prompt: string };
@@ -17,6 +17,7 @@ type WorldStateSnapshot = {
   videoUrls: string[];
   actions: SuggestedAction[];
   parentStateId?: string | null;
+  parentActionPrompt?: string | null;
 };
 
 export function WorldClient(props: {
@@ -26,7 +27,7 @@ export function WorldClient(props: {
   initialVideoUrls: string[];
   initialActions: SuggestedAction[];
 }) {
-  const [actions, setActions] = useState<SuggestedAction[]>(props.initialActions);
+  const [actions, setActions] = useState<SuggestedAction[]>([]);
   const [loading, setLoading] = useState(false);
   const [custom, setCustom] = useState("");
   const [sceneSummary, setSceneSummary] = useState(props.initialSceneSummary);
@@ -34,8 +35,22 @@ export function WorldClient(props: {
   const [storyboard, setStoryboard] = useState<StoryboardPreview | null>(null);
   const [history, setHistory] = useState<WorldStateSnapshot[]>([]);
   const [activeStateId, setActiveStateId] = useState<string>(props.initialStateId);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const isMockMode = process.env.NEXT_PUBLIC_MOCK_MODE === "true";
+
+  const actionsTimerRef = useRef<number | null>(null);
 
   const initialClips = useMemo(() => props.initialVideoUrls, [props.initialVideoUrls]);
+
+  const scheduleActions = useCallback((next: SuggestedAction[]) => {
+    if (actionsTimerRef.current) {
+      window.clearTimeout(actionsTimerRef.current);
+    }
+    setActions([]);
+    actionsTimerRef.current = window.setTimeout(() => {
+      setActions(next);
+    }, 5000);
+  }, []);
 
   const refreshHistory = useCallback(async () => {
     try {
@@ -83,6 +98,10 @@ export function WorldClient(props: {
   }, []);
 
   useEffect(() => {
+    scheduleActions(props.initialActions);
+  }, [props.initialActions, scheduleActions]);
+
+  useEffect(() => {
     void refreshHistory();
   }, [refreshHistory]);
 
@@ -102,38 +121,63 @@ export function WorldClient(props: {
     (state: WorldStateSnapshot) => {
       setActiveStateId(state.id);
       setSceneSummary(state.sceneSummary);
-      setActions(state.actions);
+      scheduleActions(state.actions);
       setError(null);
       setLoading(false);
       window.dispatchEvent(
         new CustomEvent("vyber:jumpState", { detail: { videoUrls: state.videoUrls } }),
       );
     },
-    [setActions],
+    [scheduleActions],
   );
 
   const orderedHistory = useMemo(() => history, [history]);
-  const depthById = useMemo(() => {
-    const map = new Map<string, number>();
+  const laneById = useMemo(() => {
     const byId = new Map(orderedHistory.map((state) => [state.id, state]));
-    const visit = (state: WorldStateSnapshot): number => {
-      if (map.has(state.id)) return map.get(state.id)!;
+    const childrenByParent = new Map<string, WorldStateSnapshot[]>();
+    orderedHistory.forEach((state) => {
+      if (!state.parentStateId) return;
+      const list = childrenByParent.get(state.parentStateId) ?? [];
+      list.push(state);
+      childrenByParent.set(state.parentStateId, list);
+    });
+    const laneMap = new Map<string, number>();
+    const nextLane = { value: 0 };
+
+    const assignLane = (state: WorldStateSnapshot) => {
+      if (laneMap.has(state.id)) return;
       if (!state.parentStateId) {
-        map.set(state.id, 0);
-        return 0;
+        laneMap.set(state.id, nextLane.value++);
+        return;
       }
-      const parent = byId.get(state.parentStateId);
-      if (!parent) {
-        map.set(state.id, 0);
-        return 0;
+      const parentLane = laneMap.get(state.parentStateId);
+      if (parentLane === undefined) {
+        const parent = byId.get(state.parentStateId);
+        if (parent) assignLane(parent);
       }
-      const depth = visit(parent) + 1;
-      map.set(state.id, depth);
-      return depth;
+      const siblings = childrenByParent.get(state.parentStateId) ?? [];
+      if (siblings[0]?.id === state.id) {
+        laneMap.set(state.id, laneMap.get(state.parentStateId!) ?? nextLane.value++);
+      } else {
+        laneMap.set(state.id, nextLane.value++);
+      }
     };
-    orderedHistory.forEach((state) => visit(state));
-    return map;
+
+    orderedHistory.forEach(assignLane);
+    return laneMap;
   }, [orderedHistory]);
+  const maxLane = useMemo(
+    () => Math.max(0, ...Array.from(laneById.values())),
+    [laneById],
+  );
+  const lastIndexByLane = useMemo(() => {
+    const map = new Map<number, number>();
+    orderedHistory.forEach((state, idx) => {
+      const lane = laneById.get(state.id) ?? 0;
+      map.set(lane, idx);
+    });
+    return map;
+  }, [orderedHistory, laneById]);
   const activeIndex = useMemo(
     () => orderedHistory.findIndex((state) => state.id === activeStateId),
     [orderedHistory, activeStateId],
@@ -144,8 +188,9 @@ export function WorldClient(props: {
       <div className="relative aspect-video h-full max-h-full w-full max-w-full overflow-hidden">
         <WorldCanvas
           worldId={props.worldId}
+          currentStateId={activeStateId}
           initialVideoUrls={initialClips}
-          onActions={setActions}
+          onActions={scheduleActions}
           onLoading={setLoading}
           onSceneSummary={setSceneSummary}
         />
@@ -169,7 +214,17 @@ export function WorldClient(props: {
                   disabled={loading}
                   className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15 disabled:opacity-50"
                   onClick={() => {
-                    // WorldCanvas owns the request; we just expose the prompt via a custom event.
+                    if (isMockMode) {
+                      const next =
+                        orderedHistory.find(
+                          (state) =>
+                            state.parentStateId === activeStateId &&
+                            state.parentActionPrompt === a.prompt,
+                        ) ??
+                        orderedHistory.find((state) => state.parentStateId === activeStateId);
+                      if (next) jumpToState(next);
+                      return;
+                    }
                     window.dispatchEvent(
                       new CustomEvent("vyber:action", { detail: { prompt: a.prompt } }),
                     );
@@ -180,33 +235,35 @@ export function WorldClient(props: {
               ))}
             </div>
 
-            <form
-              className="flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const prompt = custom.trim();
-                if (!prompt) return;
-                window.dispatchEvent(
-                  new CustomEvent("vyber:action", { detail: { prompt } }),
-                );
-                setCustom("");
-              }}
-            >
-              <input
-                value={custom}
-                disabled={loading}
-                onChange={(e) => setCustom(e.target.value)}
-                placeholder="Or type a custom action…"
-                className="w-full rounded-xl bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/60 outline-none ring-1 ring-white/10 focus:ring-white/25 disabled:opacity-50"
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="shrink-0 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black disabled:opacity-50"
+            {showCustomInput ? (
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const prompt = custom.trim();
+                  if (!prompt) return;
+                  window.dispatchEvent(
+                    new CustomEvent("vyber:action", { detail: { prompt } }),
+                  );
+                  setCustom("");
+                }}
               >
-                Go
-              </button>
-            </form>
+                <input
+                  value={custom}
+                  disabled={loading || isMockMode}
+                  onChange={(e) => setCustom(e.target.value)}
+                  placeholder="Type a custom action…"
+                  className="w-full rounded-xl bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/60 outline-none ring-1 ring-white/10 focus:ring-white/25 disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={loading || isMockMode}
+                  className="shrink-0 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black disabled:opacity-50"
+                >
+                  Go
+                </button>
+              </form>
+            ) : null}
 
             {error ? (
               <p className="text-xs text-red-300">
@@ -216,12 +273,30 @@ export function WorldClient(props: {
               <p className="text-xs text-white/80">Generating the next moment…</p>
             ) : (
               <p className="text-xs text-white/60">
-                Click an action to preview a storyboard before generating video.
+                {actions.length === 0
+                  ? "New prompts arrive in 5 seconds..."
+                  : "Click an action to preview a storyboard before generating video."}
               </p>
             )}
           </div>
         </div>
       </div>
+
+      {!showCustomInput ? (
+        <button
+          className="pointer-events-auto absolute right-6 top-6 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[11px] text-white/70 opacity-60 transition-opacity hover:opacity-100"
+          onClick={() => setShowCustomInput(true)}
+        >
+          Custom input
+        </button>
+      ) : (
+        <button
+          className="pointer-events-auto absolute right-6 top-6 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[11px] text-white/70 opacity-70 transition-opacity hover:opacity-100"
+          onClick={() => setShowCustomInput(false)}
+        >
+          Hide input
+        </button>
+      )}
 
       {/* Time travel panel */}
       <div className="pointer-events-auto absolute left-5 top-1/2 hidden -translate-y-1/2 md:block">
@@ -254,32 +329,56 @@ export function WorldClient(props: {
             </div>
           </div>
 
-          <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+          <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
             {orderedHistory.map((state, idx) => {
               const isActive = state.id === activeStateId;
-              const depth = depthById.get(state.id) ?? 0;
+              const lane = laneById.get(state.id) ?? 0;
+              const parentLane =
+                state.parentStateId ? laneById.get(state.parentStateId) ?? lane : lane;
               return (
                 <button
                   key={state.id}
                   onClick={() => jumpToState(state)}
                   className="group flex w-full items-start gap-3 text-left"
                 >
-                  <div
-                    className="relative flex h-6 w-6 flex-col items-center"
-                    style={{ marginLeft: `${Math.min(depth, 3) * 12}px` }}
+                  <svg
+                    width={(maxLane + 1) * 14 + 10}
+                    height={24}
+                    className="shrink-0"
                   >
-                    {depth > 0 ? (
-                      <span className="absolute -left-2 top-[6px] h-px w-2 bg-white/20" />
+                    {Array.from({ length: maxLane + 1 }).map((_, laneIdx) => {
+                      const lastIndex = lastIndexByLane.get(laneIdx) ?? -1;
+                      if (lastIndex < idx) return null;
+                      const x = laneIdx * 14 + 7;
+                      return (
+                        <line
+                          key={laneIdx}
+                          x1={x}
+                          y1={0}
+                          x2={x}
+                          y2={24}
+                          stroke="rgba(255,255,255,0.18)"
+                          strokeWidth="1"
+                        />
+                      );
+                    })}
+                    {state.parentStateId && parentLane !== lane ? (
+                      <line
+                        x1={parentLane * 14 + 7}
+                        y1={12}
+                        x2={lane * 14 + 7}
+                        y2={12}
+                        stroke="rgba(255,255,255,0.35)"
+                        strokeWidth="1"
+                      />
                     ) : null}
-                    <span
-                      className={`h-3 w-3 rounded-full ${
-                        isActive ? "bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]" : "bg-white/30"
-                      }`}
+                    <circle
+                      cx={lane * 14 + 7}
+                      cy={12}
+                      r={4}
+                      fill={isActive ? "#34d399" : "rgba(255,255,255,0.35)"}
                     />
-                    {idx < orderedHistory.length - 1 ? (
-                      <span className="mt-2 h-6 w-px bg-gradient-to-b from-white/30 to-transparent" />
-                    ) : null}
-                  </div>
+                  </svg>
                   <div className="flex-1">
                     <div className="flex items-center justify-between text-xs text-white/70">
                       <span className={isActive ? "text-emerald-200" : ""}>

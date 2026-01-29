@@ -10,6 +10,7 @@ import {
   createWorldState,
   createWorldStoryboard,
   getLatestWorldState,
+  getWorldState,
   getWorldStoryboard,
   getWorld,
   setActionsForWorldState,
@@ -20,6 +21,7 @@ export const runtime = "nodejs";
 const StepInput = z.object({
   actionPrompt: z.string().min(1).max(2000),
   storyboardId: z.string().min(1).optional(),
+  parentStateId: z.string().min(1).optional(),
 });
 
 function composePrompt(input: {
@@ -96,9 +98,17 @@ export async function POST(
     );
   }
 
+  const requestedParentId = parsed.data.parentStateId?.trim();
+  const baseState =
+    requestedParentId && requestedParentId !== latest.id
+      ? await getWorldState(requestedParentId)
+      : latest;
+  const parentState =
+    baseState && baseState.world_id === worldId ? baseState : latest;
+
   const prompt = composePrompt({
     worldPrompt: normalizeWorldPrompt(world.world_prompt),
-    sceneSummary: latest.scene_summary,
+    sceneSummary: parentState.scene_summary,
     actionPrompt: parsed.data.actionPrompt,
   });
 
@@ -112,7 +122,7 @@ export async function POST(
   // - NanoBanana: lastFrameUrl + prompt => 4-panel image
   // - Split + downscale to 480p frames, persist to /data
   // - Seedance: generate 3 clips (1->2, 2->3, 3->4) in parallel
-  const sourceImageUrl = new URL(latest.last_frame_url, req.url).toString();
+  const sourceImageUrl = new URL(parentState.last_frame_url, req.url).toString();
   let frames: [string, string, string, string] | null = null;
   let storyboardId: string | null = null;
   let storyboardFrameUrls: [string, string, string, string] | null = null;
@@ -203,7 +213,7 @@ export async function POST(
   }
 
   const worldStateId = newId();
-  let videoUrls: string[] = latest.video_urls;
+  let videoUrls: string[] = parentState.video_urls;
   try {
     const adapter = resolveVideoGenerationAdapter();
     console.log("[step] Calling video adapter for 3 clips", { worldId, adapter: adapter.name });
@@ -235,7 +245,7 @@ export async function POST(
       { status: 502 },
     );
   }
-  const sceneSummary = `${latest.scene_summary}\n\nUser did: ${parsed.data.actionPrompt}`.slice(
+  const sceneSummary = `${parentState.scene_summary}\n\nUser did: ${parsed.data.actionPrompt}`.slice(
     0,
     2000,
   );
@@ -252,13 +262,14 @@ export async function POST(
     sceneSummary,
     storyboardId,
     storyboardFrameUrls,
-    parentStateId: latest.id,
+    parentStateId: parentState.id,
+    parentActionPrompt: parsed.data.actionPrompt,
   });
 
   const actions =
     (await suggestNextActionsWithGemini({
       worldPrompt: normalizeWorldPrompt(world.world_prompt),
-      sceneSummary: latest.scene_summary,
+      sceneSummary: parentState.scene_summary,
       actionPrompt: parsed.data.actionPrompt,
       lastFrameUrl,
     })) ?? (await suggestActionsFallback(parsed.data.actionPrompt));
