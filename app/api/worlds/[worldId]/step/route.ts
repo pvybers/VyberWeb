@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { suggestNextActionsWithGemini } from "@/lib/gemini";
-import {
-  ensureDataUrl,
-  persistStoryboardFrames,
-  splitFourPanelToDataUrls,
-} from "@/lib/external/images";
+import { persistStoryboardFrames, splitFourPanelToDataUrls } from "@/lib/external/images";
 import { persistVideoUrls } from "@/lib/external/videos";
 import { nanoBananaGenerateFourPanel } from "@/lib/external/nanobanana";
-import { seedanceGenerateClip } from "@/lib/external/seedance";
+import { resolveVideoGenerationAdapter } from "@/lib/external/videoAdapters";
 import { newId } from "@/lib/ids";
 import {
   createWorldState,
@@ -209,37 +205,24 @@ export async function POST(
   const worldStateId = newId();
   let videoUrls: string[] = latest.video_urls;
   try {
-    console.log("[step] Calling Seedance for 3 clips in parallel", { worldId });
-    const seedanceFrames = (await Promise.all(
-      frames.map((frame) => ensureDataUrl(frame)),
-    )) as [string, string, string, string];
-    const clips = await Promise.all([
-      seedanceGenerateClip({ startImage: seedanceFrames[0], endImage: seedanceFrames[1], seconds: 5 }),
-      seedanceGenerateClip({ startImage: seedanceFrames[1], endImage: seedanceFrames[2], seconds: 5 }),
-      seedanceGenerateClip({ startImage: seedanceFrames[2], endImage: seedanceFrames[3], seconds: 5 }),
-    ]);
-    if (!clips.every((c) => c?.videoUrl)) {
-      console.error("[step] One or more Seedance clips missing videoUrl", { worldId, clips });
-      return NextResponse.json(
-        {
-          error: "video_generation_failed",
-          message: "Failed to generate all video clips for this action.",
-        },
-        { status: 502 },
-      );
-    }
-    videoUrls = clips.map((c) => c!.videoUrl);
+    const adapter = resolveVideoGenerationAdapter();
+    console.log("[step] Calling video adapter for 3 clips", { worldId, adapter: adapter.name });
+    videoUrls = await adapter.generateClips({
+      frames: frames as [string, string, string, string],
+      seconds: 5,
+      prompt: parsed.data.actionPrompt,
+    });
     videoUrls = await persistVideoUrls({
       worldId,
       worldStateId,
       videoUrls,
     });
-    console.log("[step] Seedance clips ready", {
+    console.log("[step] Video clips ready", {
       worldId,
       videoUrls,
     });
   } catch (err) {
-    console.error("[step] Seedance generation failed", {
+    console.error("[step] Video generation failed", {
       worldId,
       error: err,
     });
@@ -269,6 +252,7 @@ export async function POST(
     sceneSummary,
     storyboardId,
     storyboardFrameUrls,
+    parentStateId: latest.id,
   });
 
   const actions =
@@ -291,6 +275,7 @@ export async function POST(
     videoUrls,
     actions,
     sceneSummary: newState.scene_summary,
+    worldStateId: newState.id,
   });
 }
 

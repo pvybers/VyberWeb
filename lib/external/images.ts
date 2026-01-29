@@ -38,6 +38,12 @@ export async function ensureDataUrl(input: string): Promise<string> {
   return `data:${mimeType};base64,${buffer.toString("base64")}`;
 }
 
+export async function ensureDataUrl480p(input: string): Promise<string> {
+  const { buffer } = await dataUrlToBuffer(input);
+  const resized = await resizeTo480pPng(buffer);
+  return toDataUrlPng(resized);
+}
+
 async function resizeTo480pPng(input: Buffer): Promise<Buffer> {
   // Force a 16:9 480p output for lightweight previews and storage.
   return await sharp(input)
@@ -112,4 +118,3 @@ export async function persistStoryboardFrames(input: {
 
   return urls as [string, string, string, string];
 }
-

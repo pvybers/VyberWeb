@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { WorldCanvas } from "./worldCanvas";
 
 export type SuggestedAction = { label: string; prompt: string };
@@ -10,8 +10,18 @@ type StoryboardPreview = {
   actionPrompt: string;
 };
 
+type WorldStateSnapshot = {
+  id: string;
+  createdAt: string;
+  sceneSummary: string;
+  videoUrls: string[];
+  actions: SuggestedAction[];
+  parentStateId?: string | null;
+};
+
 export function WorldClient(props: {
   worldId: string;
+  initialStateId: string;
   initialSceneSummary: string;
   initialVideoUrls: string[];
   initialActions: SuggestedAction[];
@@ -22,8 +32,28 @@ export function WorldClient(props: {
   const [sceneSummary, setSceneSummary] = useState(props.initialSceneSummary);
   const [error, setError] = useState<string | null>(null);
   const [storyboard, setStoryboard] = useState<StoryboardPreview | null>(null);
+  const [history, setHistory] = useState<WorldStateSnapshot[]>([]);
+  const [activeStateId, setActiveStateId] = useState<string>(props.initialStateId);
 
   const initialClips = useMemo(() => props.initialVideoUrls, [props.initialVideoUrls]);
+
+  const refreshHistory = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/worlds/${props.worldId}/states`);
+      if (!res.ok) return;
+      const json = (await res.json()) as { states?: WorldStateSnapshot[] };
+      const states = (json.states ?? []).map((state) => ({
+        ...state,
+        createdAt: new Date(state.createdAt).toISOString(),
+      }));
+      setHistory(states);
+      if (!states.find((state) => state.id === activeStateId) && states.length > 0) {
+        setActiveStateId(states[states.length - 1]!.id);
+      }
+    } catch (err) {
+      console.warn("Failed to load world history", err);
+    }
+  }, [props.worldId, activeStateId]);
 
   useEffect(() => {
     const onStepError = (e: Event) => {
@@ -51,6 +81,63 @@ export function WorldClient(props: {
     return () =>
       window.removeEventListener("vyber:storyboardReady", onStoryboardReady as EventListener);
   }, []);
+
+  useEffect(() => {
+    void refreshHistory();
+  }, [refreshHistory]);
+
+  useEffect(() => {
+    const onStateCreated = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { worldStateId?: string } | undefined;
+      if (detail?.worldStateId) {
+        setActiveStateId(detail.worldStateId);
+      }
+      void refreshHistory();
+    };
+    window.addEventListener("vyber:stateCreated", onStateCreated as EventListener);
+    return () => window.removeEventListener("vyber:stateCreated", onStateCreated as EventListener);
+  }, [refreshHistory]);
+
+  const jumpToState = useCallback(
+    (state: WorldStateSnapshot) => {
+      setActiveStateId(state.id);
+      setSceneSummary(state.sceneSummary);
+      setActions(state.actions);
+      setError(null);
+      setLoading(false);
+      window.dispatchEvent(
+        new CustomEvent("vyber:jumpState", { detail: { videoUrls: state.videoUrls } }),
+      );
+    },
+    [setActions],
+  );
+
+  const orderedHistory = useMemo(() => history, [history]);
+  const depthById = useMemo(() => {
+    const map = new Map<string, number>();
+    const byId = new Map(orderedHistory.map((state) => [state.id, state]));
+    const visit = (state: WorldStateSnapshot): number => {
+      if (map.has(state.id)) return map.get(state.id)!;
+      if (!state.parentStateId) {
+        map.set(state.id, 0);
+        return 0;
+      }
+      const parent = byId.get(state.parentStateId);
+      if (!parent) {
+        map.set(state.id, 0);
+        return 0;
+      }
+      const depth = visit(parent) + 1;
+      map.set(state.id, depth);
+      return depth;
+    };
+    orderedHistory.forEach((state) => visit(state));
+    return map;
+  }, [orderedHistory]);
+  const activeIndex = useMemo(
+    () => orderedHistory.findIndex((state) => state.id === activeStateId),
+    [orderedHistory, activeStateId],
+  );
 
   return (
     <div className="relative flex h-dvh w-dvw items-center justify-center bg-black">
@@ -132,6 +219,86 @@ export function WorldClient(props: {
                 Click an action to preview a storyboard before generating video.
               </p>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Time travel panel */}
+      <div className="pointer-events-auto absolute left-5 top-1/2 hidden -translate-y-1/2 md:block">
+        <div className="w-64 rounded-2xl border border-white/10 bg-black/35 p-4 text-white backdrop-blur-md shadow-[0_0_30px_rgba(80,40,150,0.25)]">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
+              Time Travel
+            </div>
+            <div className="flex gap-2">
+              <button
+                disabled={loading || activeIndex <= 0}
+                className="rounded-full border border-white/15 px-2 py-1 text-[10px] text-white/70 hover:bg-white/10 disabled:opacity-40"
+                onClick={() => {
+                  const prev = orderedHistory[activeIndex - 1];
+                  if (prev) jumpToState(prev);
+                }}
+              >
+                Back
+              </button>
+              <button
+                disabled={loading || activeIndex < 0 || activeIndex >= orderedHistory.length - 1}
+                className="rounded-full border border-white/15 px-2 py-1 text-[10px] text-white/70 hover:bg-white/10 disabled:opacity-40"
+                onClick={() => {
+                  const next = orderedHistory[activeIndex + 1];
+                  if (next) jumpToState(next);
+                }}
+              >
+                Forward
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+            {orderedHistory.map((state, idx) => {
+              const isActive = state.id === activeStateId;
+              const depth = depthById.get(state.id) ?? 0;
+              return (
+                <button
+                  key={state.id}
+                  onClick={() => jumpToState(state)}
+                  className="group flex w-full items-start gap-3 text-left"
+                >
+                  <div
+                    className="relative flex h-6 w-6 flex-col items-center"
+                    style={{ marginLeft: `${Math.min(depth, 3) * 12}px` }}
+                  >
+                    {depth > 0 ? (
+                      <span className="absolute -left-2 top-[6px] h-px w-2 bg-white/20" />
+                    ) : null}
+                    <span
+                      className={`h-3 w-3 rounded-full ${
+                        isActive ? "bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]" : "bg-white/30"
+                      }`}
+                    />
+                    {idx < orderedHistory.length - 1 ? (
+                      <span className="mt-2 h-6 w-px bg-gradient-to-b from-white/30 to-transparent" />
+                    ) : null}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between text-xs text-white/70">
+                      <span className={isActive ? "text-emerald-200" : ""}>
+                        {isActive ? "Current Moment" : `Snapshot ${idx + 1}`}
+                      </span>
+                      <span className="text-[10px] text-white/40">
+                        {new Date(state.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                    <div className="mt-1 line-clamp-2 text-[11px] text-white/50 group-hover:text-white/70">
+                      {state.sceneSummary}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

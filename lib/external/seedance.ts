@@ -25,14 +25,8 @@ const SeedanceImmediateResponse = z
   })
   .passthrough();
 
-const ARK_BASE = "https://ark.cn-beijing.volces.com/api/v3";
-
 function resolveSeedanceBase(): string {
-  return (
-    process.env.SEEDANCE_API_BASE?.trim() ||
-    process.env.SEEDREAM_API_BASE?.trim() ||
-    ARK_BASE
-  );
+  return "https://ark.cn-beijing.volces.com/api/v3";
 }
 
 function formatAuthHeader(apiKey: string): string {
@@ -102,7 +96,7 @@ function isStatusFailed(status?: string): boolean {
  * Thin adapter for ByteDance Seedance (ARK) video generation.
  *
  * - Uses ARK base URL `https://ark.cn-beijing.volces.com/api/v3`
- * - Only requires `ARK_API_KEY` (or `SEEDANCE_API_KEY` for compatibility)
+ * - Only requires `SEEDANCE_API_KEY`
  * - Creates a task at `/contents/generations/tasks`, then polls same path with task id
  */
 export async function seedanceGenerateClip(input: {
@@ -110,12 +104,10 @@ export async function seedanceGenerateClip(input: {
   endImage: string;
   seconds?: number;
 }): Promise<{ videoUrl: string } | null> {
-  const apiKey =
-    process.env.ARK_API_KEY?.trim() ??
-    process.env.SEEDANCE_API_KEY?.trim() ??
-    process.env.SEEDREAM_API_KEY?.trim() ??
-    null;
-  if (!apiKey) return null;
+  const apiKey = process.env.SEEDANCE_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("Missing SEEDANCE_API_KEY");
+  }
 
   const headers: Record<string, string> = {
     "content-type": "application/json",
@@ -130,10 +122,7 @@ export async function seedanceGenerateClip(input: {
 
   // 1) Create generation task.
   const baseUrl = resolveSeedanceBase();
-  const modelName =
-    process.env.SEEDANCE_MODEL?.trim() ||
-    process.env.SEEDREAM_MODEL?.trim() ||
-    "doubao-seedance-1-5-pro-251215";
+  const modelName = "doubao-seedance-1-5-pro-251215";
   const createRes = await fetch(`${baseUrl}/contents/generations/tasks`, {
     method: "POST",
     headers,

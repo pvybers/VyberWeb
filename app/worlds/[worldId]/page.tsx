@@ -62,6 +62,7 @@ export default async function WorldPage(props: {
   return (
     <WorldClient
       worldId={worldId}
+      initialStateId={latest.id}
       initialSceneSummary={latest.scene_summary}
       initialVideoUrls={latest.video_urls}
       initialActions={actions.map((a) => ({ label: a.label, prompt: a.prompt }))}

@@ -7,6 +7,7 @@ type StepResponse = {
   videoUrls: string[];
   actions: SuggestedAction[];
   sceneSummary?: string;
+  worldStateId?: string;
 };
 
 type StoryboardResponse = {
@@ -251,9 +252,18 @@ export function WorldCanvas(props: {
 
       window.addEventListener("vyber:generateVideo", onGenerateVideo as EventListener);
 
+      const onJumpState = (e: Event) => {
+        const detail = (e as CustomEvent).detail as { videoUrls?: string[] };
+        if (!detail?.videoUrls || detail.videoUrls.length !== 3) return;
+        pendingClipSetRef.current = detail.videoUrls;
+      };
+
+      window.addEventListener("vyber:jumpState", onJumpState as EventListener);
+
       const cleanup = () => {
         window.removeEventListener("vyber:action", onAction as EventListener);
         window.removeEventListener("vyber:generateVideo", onGenerateVideo as EventListener);
+        window.removeEventListener("vyber:jumpState", onJumpState as EventListener);
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         
         // Remove event listeners
@@ -507,6 +517,13 @@ export function WorldCanvas(props: {
 
         // Begin preloading by setting pending set; the RAF loop will swap ASAP.
         pendingClipSetRef.current = json.videoUrls;
+        if (json.worldStateId) {
+          window.dispatchEvent(
+            new CustomEvent("vyber:stateCreated", {
+              detail: { worldStateId: json.worldStateId },
+            }),
+          );
+        }
         console.log("📥 Received new video URLs, will swap when ready");
       } catch (error) {
         console.error("❌ Error in generateVideo:", error);
