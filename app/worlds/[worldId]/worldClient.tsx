@@ -222,6 +222,15 @@ export function WorldClient(props: {
   );
   const treeHeight = Math.max(240, (maxDepth + 1) * ySpacing);
   const [isTreeOpen, setIsTreeOpen] = useState(false);
+  const [isTreeDragging, setIsTreeDragging] = useState(false);
+  const [treePan, setTreePan] = useState({ x: 0, y: 0 });
+  const treeDragRef = useRef({
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    originX: 0,
+    originY: 0,
+  });
   const branchFocusIds = useMemo(() => {
     const { byId, childrenByParent } = treeData;
     const currentState = byId.get(activeStateId);
@@ -381,7 +390,7 @@ export function WorldClient(props: {
           </div>
           <div className="relative flex-1">
             <div className="absolute left-3 top-1 h-[calc(100%-8px)] w-px bg-white/15" />
-            <div className="space-y-2 pr-2">
+            <div className="history-scroll max-h-[48vh] space-y-2 overflow-y-auto pr-2">
               {branchFocusIds.map((id) => {
                 const state = treeData.byId.get(id);
                 if (!state) return null;
@@ -438,12 +447,45 @@ export function WorldClient(props: {
               </div>
             </div>
 
-            <div className="max-h-[70vh] overflow-auto pr-1 no-scrollbar">
+            <div
+              className="relative h-[70vh] overflow-hidden rounded-xl border border-white/10 bg-black/70"
+              onPointerDown={(e) => {
+                const target = e.target as HTMLElement | null;
+                if (target?.closest("button[data-tree-node]")) return;
+                treeDragRef.current.dragging = true;
+                setIsTreeDragging(true);
+                treeDragRef.current.startX = e.clientX;
+                treeDragRef.current.startY = e.clientY;
+                treeDragRef.current.originX = treePan.x;
+                treeDragRef.current.originY = treePan.y;
+                (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+              }}
+              onPointerMove={(e) => {
+                if (!treeDragRef.current.dragging) return;
+                const dx = e.clientX - treeDragRef.current.startX;
+                const dy = e.clientY - treeDragRef.current.startY;
+                setTreePan({
+                  x: treeDragRef.current.originX + dx,
+                  y: treeDragRef.current.originY + dy,
+                });
+              }}
+              onPointerUp={(e) => {
+                treeDragRef.current.dragging = false;
+                setIsTreeDragging(false);
+                (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
+              }}
+              onPointerLeave={() => {
+                treeDragRef.current.dragging = false;
+                setIsTreeDragging(false);
+              }}
+              style={{ cursor: isTreeDragging ? "grabbing" : "grab" }}
+            >
               <div
-                className="relative"
+                className="absolute left-0 top-0"
                 style={{
                   width: treeWidth,
                   height: treeHeight,
+                  transform: `translate(${treePan.x}px, ${treePan.y}px)`,
                 }}
               >
                 <svg
@@ -481,6 +523,7 @@ export function WorldClient(props: {
                   return (
                     <button
                       key={state.id}
+                      data-tree-node
                       onClick={() => jumpToState(state)}
                       className={`absolute rounded-xl border px-3 py-2 text-left shadow-lg transition-colors ${
                         isActive
@@ -496,7 +539,7 @@ export function WorldClient(props: {
                     >
                       <div className="flex items-center justify-between text-[11px] text-white/70">
                         <span className={isActive ? "text-emerald-200" : ""}>
-                      {isActive ? "Current" : `Snapshot ${idx + 1}`}
+                          {isActive ? "Current" : `Snapshot ${idx + 1}`}
                         </span>
                         <span className="text-[10px] text-white/40">
                           {new Date(state.createdAt).toLocaleTimeString([], {
@@ -505,8 +548,8 @@ export function WorldClient(props: {
                           })}
                         </span>
                       </div>
-                    <div className="mt-1 line-clamp-2 text-[11px] text-white/60">
-                      {getNodeLabel(state, idx)}
+                      <div className="mt-1 line-clamp-2 text-[11px] text-white/60">
+                        {getNodeLabel(state, idx)}
                       </div>
                     </button>
                   );
@@ -517,12 +560,24 @@ export function WorldClient(props: {
         </div>
       ) : null}
       <style jsx>{`
-        .no-scrollbar {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
+        .history-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
         }
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
+        .history-scroll::-webkit-scrollbar {
+          width: 8px;
+        }
+        .history-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .history-scroll::-webkit-scrollbar-thumb {
+          background-color: rgba(255, 255, 255, 0.35);
+          border-radius: 999px;
+          border: 2px solid transparent;
+          background-clip: content-box;
+        }
+        .history-scroll::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(255, 255, 255, 0.55);
         }
       `}</style>
     </div>
